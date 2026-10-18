@@ -1,0 +1,156 @@
+# The model registry: every model an experiment cell names, pinned by revision, and how
+# it is served. scripts/serve.sh reads it; `rulegen report --prices` reads `frontier:`.
+#
+# Local models are served over the OpenAI-compatible wire. `served_model_name` is the
+# wire id the cells send (`model.model`), so a cell names its model, not a path.
+# `thinking: false` marks a model with a thinking switch, which the cells turn off
+# (`model.thinking`); a model without the key runs at the server default.
+#
+# Precision: each model at the precision its publisher ships -- BF16, or FP8 where the
+# release is FP8 only (Devstral-Small-2-24B-Instruct-2512, and the FP8 build of the 80B
+# MoE so it fits one GPU). The GGUF anchor is a separate model entry: its rows are
+# never pooled with the BF16 ones.
+
+# vLLM in a container, one image for every model in the matrix (vLLM 0.24.0 with
+# transformers 5.12.1 loads all of their architectures). --max-model-len is
+# model.context_tokens: budget_tokens 8192 x 1.5 safety + max_tokens 2048 = 14336,
+# so 16384 is the floor. --max-num-seqs is the batching width model.concurrency draws
+# on; neither is part of what a cell measures. --gpu-memory-utilization is not here:
+# scripts/serve.sh computes it per model from size_gb + kv_gb.
+vllm:
+  image: vllm/vllm-openai:v0.24.0
+  port: 8080
+  kv_gb: 20
+  server_flags: >-
+    --max-model-len 16384 --max-num-seqs 64
+    --enable-prefix-caching --disable-uvicorn-access-log
+
+# llama-server for the GGUF anchor (qwen3.8-27b-gguf): 4 slots of 16K context.
+llama_cpp:
+  port: 8080
+  server_flags: >-
+    -c 65536 -np 4 -ngl 99 --jinja -fa on -ctk q8_0 -ctv q8_0
+    --reasoning-format deepseek
+
+models:
+  qwen3.8-27b:
+    repo: Qwen/Qwen3.8-27B
+    revision: 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0
+    served_model_name: qwen3.8-27b-bf16
+    thinking: false
+    quant: BF16
+    size_gb: 52
+  qwen3.8-27b-gguf:
+    engine: llama.cpp
+    repo: unsloth/Qwen3.8-27B-GGUF
+    revision: 4ca720788d1e01f1bff70c033e0d0028fd02e502
+    file: Qwen3.8-27B-UD-Q4_K_M.gguf
+    sha256: 322e194ff79741c7baa497c240f677f54b201b0efab44ca8e50f122b39123482
+    served_model_name: qwen3.8-27b-ud-q4_k_m
+    thinking: false
+    quant: UD-Q4_K_M
+    size_gb: 16.5
+  qwen3-coder-next-80b:
+    repo: Qwen/Qwen3-Coder-Next-FP8
+    revision: da6e2ed27304dd39abadd9c82ef50e8de67bdd4c
+    served_model_name: qwen3-coder-next-80b-fp8
+    quant: FP8
+    size_gb: 75
+    # A smaller KV pool than the default: the sweep's requests are 16K at most, and
+    # 75 GB of weights already claim most of one card.
+    kv_gb: 8
+  devstral-24b:
+    repo: mistralai/Devstral-Small-2-24B-Instruct-2512
+    revision: 55c5b41e98c2dbd21b0c8afffc540dcfc9eb5128
+    served_model_name: devstral-small-2-24b-fp8
+    quant: FP8
+    size_gb: 24.3
+  qwen2.5-coder-32b:
+    repo: Qwen/Qwen2.5-Coder-32B-Instruct
+    revision: 381fc969f78efac66bc87ff7ddeadb7e73c218a7
+    served_model_name: qwen2.5-coder-32b-bf16
+    quant: BF16
+    size_gb: 62
+  qwen2.5-coder-14b:
+    repo: Qwen/Qwen2.5-Coder-14B-Instruct
+    revision: aedcc2d42b622764e023cf882b6652e646b95671
+    served_model_name: qwen2.5-coder-14b-bf16
+    quant: BF16
+    size_gb: 28
+  qwen2.5-coder-7b:
+    repo: Qwen/Qwen2.5-Coder-7B-Instruct
+    revision: c03e6d358207e414f1eca0bb1891e29f1db0e242
+    served_model_name: qwen2.5-coder-7b-bf16
+    quant: BF16
+    size_gb: 15
+  qwen3-coder-30b-a3b:
+    repo: Qwen/Qwen3-Coder-30B-A3B-Instruct
+    revision: b2cff646eb4bb1d68355c01b18ae02e7cf42d120
+    served_model_name: qwen3-coder-30b-a3b-bf16
+    quant: BF16
+    size_gb: 57
+
+# Proprietary models, reached through the vendors' CLIs (claude-cli / codex-cli
+# adapters). These list prices turn logged token usage into the $/rule column
+# (`rulegen report --prices`). Keyed by the model id the CLI resolves (claude's
+# `modelUsage`, codex's `-m`); `alias` is what the experiment YAML names. USD per
+# million tokens, read off the vendors' pricing pages on `price_date`; a missing
+# number stays null rather than guessed.
+frontier:
+  claude-fable-5-1:
+    vendor: anthropic
+    cli: claude
+    alias: fable
+    rung: flagship
+    input_per_mtok: 10.0
+    cached_input_per_mtok: 0.25
+    output_per_mtok: 50.0
+    price_date: 2026-09-24
+    source: https://platform.claude.com/docs/en/about-claude/pricing
+  claude-opus-5-5:
+    vendor: anthropic
+    cli: claude
+    alias: opus
+    rung: matches-flagship
+    input_per_mtok: 4.0
+    cached_input_per_mtok: 0.20
+    output_per_mtok: 20.0
+    price_date: 2026-09-24
+    source: https://platform.claude.com/docs/en/about-claude/pricing
+  claude-sonnet-5:
+    vendor: anthropic
+    cli: claude
+    alias: sonnet
+    rung: budget
+    input_per_mtok: 2.0
+    cached_input_per_mtok: 0.20
+    output_per_mtok: 10.0
+    price_date: 2026-09-24
+    source: https://platform.claude.com/docs/en/about-claude/pricing
+  gpt-6-astra:
+    vendor: openai
+    cli: codex
+    rung: flagship
+    input_per_mtok: 10.0
+    cached_input_per_mtok: 1.0
+    output_per_mtok: 50.0
+    price_date: 2026-09-24
+    source: press coverage of the 2026-09-22 launch (VentureBeat); verify on openai.com/api/pricing
+  gpt-6-sol:
+    vendor: openai
+    cli: codex
+    rung: matches-flagship
+    input_per_mtok: 2.0
+    cached_input_per_mtok: 0.20
+    output_per_mtok: 10.0
+    price_date: 2026-09-24
+    source: press coverage of the 2026-09-22 launch (VentureBeat); verify on openai.com/api/pricing
+  gpt-6-luna:
+    vendor: openai
+    cli: codex
+    rung: budget
+    input_per_mtok: 0.10
+    cached_input_per_mtok: 0.01
+    output_per_mtok: 0.50
+    price_date: 2026-09-24
+    source: press coverage of the 2026-09-22 launch (VentureBeat); verify on openai.com/api/pricing

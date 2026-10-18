@@ -1,0 +1,36 @@
+# The validate-repair loop: b independent attempt chains per CVE, each repaired for up
+# to `rounds` rounds from the oracle's structured failure text (feedback: oracle) or from
+# a self-critique checklist that carries no oracle information (feedback: critique).
+# scripts/repair_loop.sh composes its cells from this file, for example
+#   uv run rulegen run --config experiments/pipeline.yaml --set run_id=pipeline-qwen3.8-27b-ph-val-oracle \
+#       --set model.model=qwen3.8-27b-bf16 --set model.thinking=false \
+#       --set prompt.policy=P-H --set pipeline.feedback=oracle
+mode: pipeline
+model:
+  adapter: openai-compat
+  model: qwen3.8-27b-bf16
+  thinking: false
+  concurrency: 32
+  timeout_s: 900
+prompt:
+  system_prompt: sys-v1
+  policy: P-H
+  budget_tokens: 8192
+sampling:
+  n: 1
+  temperature: 0.7
+  top_p: 0.95
+  max_tokens: 2048
+  seed: 0
+pipeline:
+  attempts: 8
+  rounds: 3
+  feedback: oracle
+data:
+  split: val
+oracle:
+  jobs: 16
+  heavy_slots: 4
+  # T4 costs a lib/ prefilter scan per rule and only feeds the audit, not the
+  # repair feedback that matters here; the -full rescore adds it afterwards.
+  run_selectivity: false

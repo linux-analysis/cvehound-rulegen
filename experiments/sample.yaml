@@ -1,0 +1,28 @@
+# One local model, sampled: n samples per CVE on one split, every sample scored.
+# scripts/sweep.sh composes its cells from this file, for example
+#   uv run rulegen run --config experiments/sample.yaml --set run_id=sample-qwen3.8-27b-pm-val \
+#       --set model.model=qwen3.8-27b-bf16 --set model.thinking=false \
+#       --set prompt.policy=P-M --set data.split=val
+mode: sample
+model:
+  adapter: openai-compat
+  model: qwen3.8-27b-bf16     # the wire id (experiments/models.yaml: served_model_name)
+  thinking: false             # the registry says which models have the switch; null otherwise
+  concurrency: 32
+  timeout_s: 900
+prompt:
+  system_prompt: sys-v1
+  policy: P-H
+  budget_tokens: 8192
+sampling:
+  n: 20
+  temperature: 0.7
+  top_p: 0.95
+  max_tokens: 2048
+  seed: 0
+data:
+  split: val
+oracle:
+  jobs: 16
+  heavy_slots: 4
+  run_selectivity: true

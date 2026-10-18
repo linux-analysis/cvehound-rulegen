@@ -1,0 +1,17 @@
+# The mechanical baseline: star the removed statements of the touched function,
+# `when !=` what a pure addition added. No model; the floor every model row must clear.
+# scripts/reference.sh runs it on every split: --set data.split=train|val|test.
+mode: mechanical
+model:
+  adapter: mechanical
+prompt:
+  policy: P-C
+sampling:
+  n: 1
+  temperature: 0.0
+data:
+  split: val
+oracle:
+  jobs: 16
+  heavy_slots: 4
+  run_selectivity: true

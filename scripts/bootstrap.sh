@@ -3,12 +3,13 @@
 #
 #   scripts/bootstrap.sh check    # report every prerequisite; change nothing (default)
 #   scripts/bootstrap.sh setup    # do the idempotent steps that are missing
-#   scripts/bootstrap.sh verify   # the sanity runs: unit tests and a short gold replay
+#   scripts/bootstrap.sh verify   # the sanity runs: unit tests, a short gold replay, smoke runs
 #
 # Layout, side by side (override with CVEHOUND_REPO, CVEHOUND_KERNEL, CVEHOUND_CACHE):
 #   <parent>/cvehound               the cvehound checkout (its test suite audits rules)
 #   <parent>/cvehound/tests/linux   the kernel clone, remotes origin / next / stable
 #   <parent>/cvehound-rulegen       this repository
+# MODEL names the registry entry the model-server step checks (default qwen3.8-27b).
 #
 # Nothing here is destructive, and every setup step is skipped when its output
 # already exists.
@@ -20,6 +21,7 @@ MODE=${1:-check}
 CVEHOUND=$(cd "${CVEHOUND_REPO:-../cvehound}" 2>/dev/null && pwd || echo "${CVEHOUND_REPO:-../cvehound}")
 KERNEL=${CVEHOUND_KERNEL:-$CVEHOUND/tests/linux}
 CACHE=${CVEHOUND_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/cvehound}
+MODEL=${MODEL:-qwen3.8-27b}
 JOBS=${JOBS:-$(nproc)}
 export CVEHOUND_CONTENT=none
 
@@ -40,7 +42,7 @@ setup() { [ "$MODE" = setup ]; }
 
 # ---------------------------------------------------------------- 1. host
 # The oracle is CPU-bound spatch + git grep, each whole-tree scan runs under an
-# 8 GiB RLIMIT_AS.
+# 8 GiB RLIMIT_AS, and a generation server needs a GPU big enough for its weights.
 step "host"
 threads=$(nproc)
 mem_gb=$(awk '/MemTotal/ {printf "%d", $2 / 1024 / 1024}' /proc/meminfo)
@@ -200,12 +202,50 @@ else
 fi
 [ -d runs/oracle/astcache ] && ok "AST cache present" || warn "no AST cache yet (built as rules are scored)"
 
+# ---------------------------------------------------------------- 7. model server
+step "model server ($MODEL)"
+read -r served engine image port < <(uv run --no-sync python -c "
+import yaml; m = yaml.safe_load(open('experiments/models.yaml'))
+a = m['models']['$MODEL']
+engine = a.get('engine', 'vllm')
+print(a['served_model_name'], engine, m['vllm']['image'], (m['llama_cpp'] if engine == 'llama.cpp' else m['vllm'])['port'])" 2>/dev/null)
+weights=$(scripts/serve.sh path "$MODEL" 2>/dev/null)
+if [ -e "${weights:-}" ]; then
+    ok "weights $weights"
+else
+    miss "no weights for $MODEL at ${weights:-?} (hf download, see scripts/serve.sh)"
+fi
+if [ "$engine" = vllm ]; then
+    if command -v docker >/dev/null && docker image inspect "$image" >/dev/null 2>&1; then
+        ok "serving image $image"
+    elif command -v docker >/dev/null; then
+        warn "serving image $image not pulled yet (docker pull $image)"
+    else
+        warn "no docker: serve the weights some other way on 127.0.0.1:$port"
+    fi
+fi
+# An open port is not a model server: ask the wire protocol the run will speak, and
+# require the config's id in the list.
+models_json=$(curl -s -m 5 "http://127.0.0.1:$port/v1/models" 2>/dev/null || true)
+if printf '%s' "$models_json" | grep -q '"'"$served"'"'; then
+    ok "$served served at 127.0.0.1:$port"
+elif printf '%s' "$models_json" | grep -q '"object"'; then
+    warn "127.0.0.1:$port answers /v1/models but does not serve '$served' (the served name must match the config)"
+else
+    warn "no OpenAI-compatible server at 127.0.0.1:$port yet (scripts/serve.sh $MODEL)"
+fi
+
 # ---------------------------------------------------------------- 8. verify
 if [ "$MODE" = verify ]; then
     step "verify (each step must pass before a sweep)"
     run uv run --no-sync pytest -q || miss "unit tests"
     run uv run --no-sync rulegen replay-gold --jobs 8 --limit 20 --selectivity --range --range-mode commits \
         --range-max-points 0 --tree --heads --heavy-slots 2 || miss "gold replay (20 rules): spatch, clone or metadata disagree with the oracle's expectations"
+    run uv run --no-sync rulegen run --config experiments/smoke.yaml || miss "fake-adapter smoke"
+    cve=$(uv run --no-sync python -c "
+from rulegen import extract
+print(extract.load_examples('data/examples/val.parquet')[0].cve)" 2>/dev/null)
+    run uv run --no-sync rulegen show-prompt --cve "$cve" --policy P-H >/dev/null || miss "show-prompt on $cve"
 fi
 
 step "summary"

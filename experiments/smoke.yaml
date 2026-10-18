@@ -1,0 +1,19 @@
+# End-to-end smoke test of the harness with a scripted adapter and the real oracle:
+#   uv run rulegen run --config experiments/smoke.yaml
+# A served model is smoked from the sampling template (scripts/sweep.sh smoke <model-key>),
+# a vendor CLI from the frontier one (scripts/frontier.sh smoke).
+run_id: smoke
+mode: sample
+model:
+  adapter: fake
+prompt:
+  policy: P-M
+sampling:
+  n: 2
+  temperature: 0.0
+data:
+  split: val
+  limit: 2
+oracle:
+  jobs: 2
+  run_selectivity: false

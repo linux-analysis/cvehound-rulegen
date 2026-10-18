@@ -1,0 +1,39 @@
+# A frontier model through its vendor CLI (claude-cli / codex-cli), in the validate-repair
+# loop at b=4 on the gold panel. scripts/frontier.sh composes every frontier cell from this
+# file; the variants it runs:
+#   sampling, n=8           --set mode=sample --set sampling.n=8
+#   self-critique control   --set pipeline.feedback=critique
+#   effort ablation         --set model.effort=low|xhigh --set data.subset=data/panel-half.txt
+#   thinking off            --set model.thinking=false --set data.subset=data/panel-half.txt
+#   the new-rule panel      --set data.split=newrule200 --set data.subset=data/panel-newrule.txt
+#   another model           --set model.adapter=codex-cli --set model.model=gpt-6-astra
+mode: pipeline
+model:
+  adapter: claude-cli
+  model: fable                # the id or alias the CLI resolves (experiments/models.yaml: frontier)
+  effort: medium
+  concurrency: 3
+  timeout_s: 1800
+  max_retries: 3
+prompt:
+  system_prompt: sys-v1
+  policy: P-H
+  budget_tokens: 8192
+sampling:
+  n: 1
+  temperature: 0.7  # provider default is what runs; recorded, not honored
+  top_p: 0.95
+  max_tokens: 4096
+  seed: 0
+pipeline:
+  attempts: 4
+  rounds: 3
+  feedback: oracle
+  accept: valid
+data:
+  split: gold
+  subset: data/panel-frontier.txt
+oracle:
+  jobs: 12
+  run_selectivity: false  # the -full rescore adds T4/T5/T6/cost afterwards
+chunk_cves: 4

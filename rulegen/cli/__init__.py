@@ -8,13 +8,13 @@ import argparse
 import logging
 import sys
 
-from rulegen.cli import common, data, oracle
+from rulegen.cli import common, data, gen, oracle, panels
 from rulegen.oracle.service import install_diag_handler
 
 log = logging.getLogger('rulegen')
 
 # In the order `rulegen --help` lists them.
-COMMANDS = (data, oracle)
+COMMANDS = (data, oracle, panels, gen)
 
 
 def build_parser() -> argparse.ArgumentParser:
