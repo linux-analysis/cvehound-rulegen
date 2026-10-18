@@ -1,0 +1,15 @@
+# Python and tooling caches
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# Data, runs and reports: built or written locally, never committed
+/data/
+/runs/
+/reports/

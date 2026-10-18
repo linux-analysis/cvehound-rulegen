@@ -1,0 +1,37 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "cvehound-rulegen"
+abstract: >-
+  A testbench and pipeline for generating CVEhound Coccinelle detection rules for
+  Linux kernel CVEs with language models. Each candidate rule is judged by an
+  oracle that runs it against the kernel's git history -- before and after the fix,
+  at the introducing commit and at every stable backport -- with the same verdict
+  machinery as the CVEhound test suite.
+authors:
+  - family-names: "Efremov"
+    given-names: "Denis"
+    orcid: "https://orcid.org/0000-0002-9916-056X"
+  - family-names: "Evstratov"
+    given-names: "Viktor"
+    orcid: "https://orcid.org/0000-0002-0796-6559"
+repository-code: "https://github.com/linux-analysis/cvehound-rulegen"
+url: "https://github.com/linux-analysis/cvehound-rulegen"
+license: GPL-3.0-only
+keywords:
+  - linux-kernel
+  - cve
+  - coccinelle
+  - cvehound
+  - vulnerability-detection
+  - static-analysis
+  - llm
+  - code-generation
+references:
+  - type: software
+    title: "CVEhound"
+    authors:
+      - family-names: "Efremov"
+        given-names: "Denis"
+        orcid: "https://orcid.org/0000-0002-9916-056X"
+    url: "https://github.com/linux-analysis/cvehound"
