@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # The frontier baselines, one cell after another, in budget tiers: the frontier-* cells
-# through the vendors' CLIs, the local anchor on the same panels, and the leakage
-# probes. Every CLI cell is experiments/frontier.yaml with the model and the variant
-# set on the command line; the anchor cells come from experiments/sample.yaml and
-# experiments/pipeline.yaml (scripts/cells.sh).
+# through the vendors' CLIs, the local anchor on the same panels, the agent runs, and
+# the leakage probes. Every CLI cell is experiments/frontier.yaml with the model and the
+# variant set on the command line; the anchor cells come from experiments/sample.yaml
+# and experiments/pipeline.yaml (scripts/cells.sh).
 #
 #   scripts/frontier.sh smoke        # 2-CVE live smoke of each CLI adapter, then the reports
 #   scripts/frontier.sh 1            # tier 1: astra/sol/fable/opus sampling + loop, probes, anchor panels
-#   scripts/frontier.sh 2            # tier 2: luna/sonnet, effort ablations, new-rule cells
-#   scripts/frontier.sh 3            # tier 3: self-critique controls
+#   scripts/frontier.sh 2            # tier 2: luna/sonnet, effort ablations, new-rule cells, agent (Claude Code)
+#   scripts/frontier.sh 3            # tier 3: self-critique controls, agent (codex)
 #   scripts/frontier.sh anthropic    # every claude cell, generation only, in priority order
 #   scripts/frontier.sh openai       # the same for codex
-#   scripts/frontier.sh post         # the -full / -canon / report of every run that lacks them
+#   scripts/frontier.sh post         # the -full / -canon / report (and agent audit) of every run that lacks them
 #   STEPS=gen|post|all               # which half of each cell to run (default all)
 #   CONCURRENCY=6                    # requests in flight for the CLI cells (not part of the cell identity)
 #   CHUNK=12                         # CVEs per scoring chunk; a loop round is a barrier per chunk, so
@@ -43,7 +43,7 @@ mkdir -p "$LOGS" reports
 export CVEHOUND_CONTENT=none
 
 wait_idle() { # one oracle at a time: wait for (or refuse) another rulegen job
-    while pgrep -f 'rulegen (ru[n]|resco[r]e) ' >/dev/null; do
+    while pgrep -f 'rulegen (ru[n]|resco[r]e|agent-ru[n]) ' >/dev/null; do
         if [ "${WAIT:-0}" != 1 ]; then
             echo "another rulegen job is running; one oracle at a time (WAIT=1 to wait)" >&2
             exit 1
@@ -154,6 +154,35 @@ probe() { # membership probe of one model, 50 rules
         --out "$out" 2>&1 | tee -a "$LOGS/probe-$3.log" || echo "!!! probe $model failed"
 }
 
+post_agent() { # -full, report, export and the suite audit of a finished agent run
+    local run=$1
+    [ -f "runs/$run/samples.jsonl" ] || { echo "no run at runs/$run" >&2; return 0; }
+    echo "=== post $run ($(ts))"
+    wait_idle
+    uv run rulegen rescore --run "runs/$run" --out "runs/$run-full" \
+        "${SUITE_PARITY[@]}" --jobs 8 --heavy-slots 2 2>&1 | tee -a "$LOGS/$run-full.log"
+    uv run rulegen report --run "runs/$run" --run "runs/$run-full" --out "reports/$run" \
+        >> "$LOGS/$run-full.log" 2>&1
+    uv run rulegen export-rules --run "runs/$run" --column agent_rule_text --out "runs/$run/rules"
+    AUDIT_HEADS="runs/$run/manifest.json" AUDIT_LOG="reports/audit-$run.log" \
+        scripts/audit_rules.sh "runs/$run/rules" 8 || echo "audit of $run reported failures (see reports/audit-$run.log)"
+}
+
+agent() { # agent <cli> <model> <panel name> <id list>: one agent session per CVE
+    local cli=$1 model=$2 name=$3 subset=$4 run="agent-$1-$3" agents=${CONCURRENCY:-2}
+    [ "$agents" -gt 3 ] && agents=3  # each session runs the suite on the shared kernel clone
+    if [ "$STEPS" != post ]; then
+        echo "=== $run ($(ts))"
+        wait_idle
+        uv run rulegen agent-run --run-id "$run" --cli "$cli" --model "$model" --effort medium \
+            --split "$( [ "$name" = new ] && echo newrule || echo gold )" --subset "$subset" \
+            --agents "$agents" --max-wall-s 2700 --max-tool-calls 200 --jobs 4 --resume \
+            2>&1 | tee -a "$LOGS/$run.log" || echo "!!! $run failed ($(ts)); resume later"
+    fi
+    [ "$STEPS" != gen ] && post_agent "$run"
+    return 0
+}
+
 newrule_examples() { # the new-rule cells read data/examples/newrule200.parquet
     if [ ! -f data/examples/newrule200.parquet ] || [ data/examples/newrule200.parquet -ot data/cves.parquet ]; then
         echo "=== building data/examples/newrule200.parquet ($(ts))"
@@ -164,7 +193,7 @@ newrule_examples() { # the new-rule cells read data/examples/newrule200.parquet
 }
 
 preflight() {
-    for f in data/panel-frontier.txt data/panel-half.txt data/panel-newrule.txt; do
+    for f in data/panel-frontier.txt data/panel-half.txt data/panel-agent.txt data/panel-newrule.txt; do
         [ -f "$f" ] || { echo "missing $f (rulegen sample-panel; see README.md)" >&2; exit 1; }
     done
     wait_idle
@@ -196,11 +225,15 @@ case "$TIER" in
         fcell astra o4-new
         anchor_cell pipeline-qwen3.8-27b-ph-newrule-oracle pipeline \
             --set data.split=newrule200 --set data.subset=data/panel-newrule.txt
+        agent claude fable new data/panel-newrule.txt
+        agent claude fable gold data/panel-agent.txt
         ;;
     3)
         need claude codex
         fcell fable c4
         fcell astra c4
+        agent codex gpt-6-astra new data/panel-newrule.txt
+        agent codex gpt-6-astra gold data/panel-agent.txt
         ;;
     anthropic) # spend the Anthropic usage window: generation only, tier 1 first, then tiers 2 and 3
         # The flagship has its own cap on top of the plan's window, so the opus and
@@ -214,6 +247,8 @@ case "$TIER" in
         fcell fable o4-nothink
         fcell fable o4-new
         probe claude-cli fable fable
+        agent claude fable new data/panel-newrule.txt
+        agent claude fable gold data/panel-agent.txt
         fcell fable c4
         ;;
     openai) # the same for the OpenAI usage window: every astra cell first, then sol and luna
@@ -225,6 +260,8 @@ case "$TIER" in
         fcell astra o4-new
         probe codex-cli gpt-6-astra astra
         fcell astra c4
+        agent codex gpt-6-astra new data/panel-newrule.txt
+        agent codex gpt-6-astra gold data/panel-agent.txt
         fcell sol s8; fcell sol o4
         fcell luna s8; fcell luna o4
         probe codex-cli gpt-6-sol sol; probe codex-cli gpt-6-luna luna
@@ -235,6 +272,12 @@ case "$TIER" in
             case "$d" in *-full|*-canon) continue ;; esac
             [ -f "$d-full/samples.parquet" ] && continue
             post_cell "$(basename "$d")"
+        done
+        for d in runs/agent-*; do
+            [ -f "$d/samples.jsonl" ] || continue
+            case "$d" in *-full|*-canon) continue ;; esac
+            [ -f "$d-full/samples.parquet" ] && continue
+            post_agent "$(basename "$d")"
         done
         anchor_panels new
         ;;

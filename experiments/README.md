@@ -41,6 +41,7 @@ model (`fable`, `astra`, ...); `<policy>` is `pb`, `pm` or `ph`.
 | `frontier-<model>-o4-low`, `-xhigh`, `-nothink` | effort and thinking ablations of the loop on the half panel | `scripts/frontier.sh` |
 | `frontier-<model>-o4-new` | the loop on the new-rule panel: CVEs no published rule exists for | `scripts/frontier.sh` |
 | `sample-qwen3.8-27b-ph-panel`, `pipeline-qwen3.8-27b-ph-{panel,newrule}-oracle` | the local anchor on the same panels, paired per CVE with the frontier cells | `scripts/frontier.sh` |
+| `agent-<cli>-{gold,new}` | one agent session per CVE (`rulegen agent-run`) on the agent panel and the new-rule panel | `scripts/frontier.sh` |
 | `smoke`, `smoke-<model>`, `smoke-<model>-cli` | smoke tests: the scripted adapter, a served model (`sweep.sh smoke`), a vendor CLI (`frontier.sh smoke`) | |
 
 Input policies (`prompt.policy`, rulegen/promptbuild.py): **P-B** the `-U3` diff; **P-C**

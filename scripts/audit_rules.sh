@@ -33,7 +33,7 @@ if [ -n "$(git -C "$CVEHOUND" status --porcelain --untracked-files=no)" ]; then
     echo "$CVEHOUND has uncommitted changes; commit or stash them first" >&2
     exit 1
 fi
-if pgrep -f 'rulegen (ru[n]|resco[r]e) ' >/dev/null; then
+if pgrep -f 'rulegen (ru[n]|agent-ru[n]|resco[r]e) ' >/dev/null; then
     echo "a rulegen run is using $CVEHOUND; wait for it to finish" >&2
     exit 1
 fi

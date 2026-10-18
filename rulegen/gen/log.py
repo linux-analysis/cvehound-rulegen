@@ -74,6 +74,17 @@ class SampleRow:
     sampling_honored: bool = True
     tool_calls: int = 0  # tools that ran; 0 in a direct-response cell (such replies are retried)
     tool_attempts_denied: int = 0  # tool calls the CLI refused before this reply (kept)
+    # Agent sessions: the agent's final message, the rule file it left
+    # behind, and what it did along the way.
+    agent_message: str | None = None
+    agent_rule_text: str | None = None
+    num_turns: int | None = None
+    duration_ms: int | None = None
+    pytest_ran: bool = False
+    pytest_passed: bool | None = None
+    validator_ran: bool = False
+    kernel_clean: bool | None = None
+    timed_out: bool = False
     score: dict[str, Any] = field(default_factory=dict)  # Score.to_row(); flattened on write
 
     def as_record(self) -> dict[str, Any]:
