@@ -1,0 +1,21 @@
+diff --git a/fs/ksmbd/auth.c b/fs/ksmbd/auth.c
+--- a/fs/ksmbd/auth.c
++++ b/fs/ksmbd/auth.c
+@@ -290,86 +290,87 @@ int ksmbd_auth_ntlmv2(struct ksmbd_conn *conn, struct ksmbd_session *sess,
+ /**
+  * ksmbd_decode_ntlmssp_auth_blob() - helper function { not a brace }
+  */
+ int ksmbd_decode_ntlmssp_auth_blob(struct authenticate_message *authblob,
+ 				   int blob_len, struct ksmbd_conn *conn,
+ 				   struct ksmbd_session *sess)
+ {
+ 	char *domain_name = "{";
+ 
+-	if (blob_len < (u64)dn_off + dn_len || blob_len < (u64)nt_off + nt_len)
++	if (blob_len < (u64)dn_off + dn_len || blob_len < (u64)nt_off + nt_len ||
++	    nt_len < CIFS_ENCPWD_SIZE)
+ 		return -EINVAL;
+ 
+ 	kfree(domain_name);
+ 	return ret;
+ }

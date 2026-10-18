@@ -1,0 +1,29 @@
+diff --git a/fs/overlayfs/copy_up.c b/fs/overlayfs/copy_up.c
+index 140f2742074d..c14e90764e35 100644
+--- a/fs/overlayfs/copy_up.c
++++ b/fs/overlayfs/copy_up.c
+@@ -993,63 +993,67 @@ static int ovl_copy_up_meta_inode_data(struct ovl_copy_up_ctx *c)
+ static int ovl_copy_up_one(struct dentry *parent, struct dentry *dentry,
+ 			   int flags)
+ {
+ 	int err;
+ 	struct ovl_copy_up_ctx ctx = {
+ 		.parent = parent,
+ 	};
+ 
+ 	err = vfs_getattr(&ctx.lowerpath, &ctx.stat,
+ 			  STATX_BASIC_STATS, AT_STATX_SYNC_AS_STAT);
+ 	if (err)
+ 		return err;
+ 
++	if (!kuid_has_mapping(current_user_ns(), ctx.stat.uid) ||
++	    !kgid_has_mapping(current_user_ns(), ctx.stat.gid))
++		return -EOVERFLOW;
++
+ 	ctx.metacopy = ovl_need_meta_copy_up(dentry, ctx.stat.mode, flags);
+ 
+ 	/* maybe truncate regular file. this has no effect on dirs */
+ 	if (flags & O_TRUNC)
+ 		ctx.stat.size = 0;
+ 	return err;
+ }

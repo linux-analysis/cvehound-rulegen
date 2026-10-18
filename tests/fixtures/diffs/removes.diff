@@ -1,0 +1,20 @@
+diff --git a/net/sched/cls_route.c b/net/sched/cls_route.c
+--- a/net/sched/cls_route.c
++++ b/net/sched/cls_route.c
+@@ -472,100 +472,99 @@ static int route4_set_parms(struct net *net, struct tcf_proto *tp,
+ static int route4_change(struct net *net, struct sk_buff *in_skb,
+ 			 struct tcf_proto *tp, unsigned long base, u32 handle,
+ 			 struct netlink_ext_ack *extack)
+ {
+ 	struct route4_filter *fold, *f = NULL;
+ 	bool new = true;
+ 
+ 	if (fold) {
+ 		f->id = fold->id;
+ 		f->iif = fold->iif;
+-		f->res = fold->res;
+ 		f->handle = fold->handle;
+ 		new = false;
+ 	}
+ 	return 0;
+ }

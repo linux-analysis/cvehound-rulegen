@@ -1,0 +1,84 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cvehound-rulegen"
+version = "0.1.0"
+description = "Generate and verify CVEhound detection rules for Linux kernel CVEs with language models"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Denis Efremov", email = "efremov@linux.com" },
+    { name = "Viktor Evstratov", email = "viktor.evst@gmail.com" },
+]
+keywords = [
+    "linux-kernel",
+    "cve",
+    "coccinelle",
+    "cvehound",
+    "semantic-patches",
+    "vulnerability-detection",
+    "static-analysis",
+    "llm",
+    "code-generation",
+    "benchmark",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = [
+    # cvehound's oracle (mini-trees, verdict cache) and, through its `spatch`
+    # extra, the cvehound-spatch wheel whose scan-completion summary the oracle
+    # relies on (>= 1.3.3.post1).
+    "cvehound[spatch]>=1.8.0",
+    "filelock",
+    "gitpython",
+    "pyarrow",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+# Generation: the OpenAI-compatible HTTP adapter and exact tokenizers. Sampling
+# talks to a server, so there is still no torch here.
+gen = ["httpx>=0.27", "tokenizers"]
+
+[project.urls]
+Homepage = "https://github.com/linux-analysis/cvehound-rulegen"
+Repository = "https://github.com/linux-analysis/cvehound-rulegen"
+Issues = "https://github.com/linux-analysis/cvehound-rulegen/issues"
+CVEhound = "https://github.com/linux-analysis/cvehound"
+
+[project.scripts]
+rulegen = "rulegen.cli:main"
+
+[dependency-groups]
+dev = ["pytest", "ruff", "httpx>=0.27"]
+
+[tool.setuptools.packages.find]
+include = ["rulegen*"]
+# Regular packages only. Namespace discovery descends into every directory
+# before `include` filters, which means walking the kernel trees under runs/.
+namespaces = false
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
