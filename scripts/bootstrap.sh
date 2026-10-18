@@ -184,6 +184,8 @@ build data/tiers.parquet     "minutes"  uv run --no-sync rulegen tier-corpus --j
 for split in train val test; do
     build "data/examples/$split.parquet" "minutes" uv run --no-sync rulegen build-dataset --split "$split" --jobs "$JOBS"
 done
+build data/pool-clean.3.txt  "seconds"  uv run --no-sync rulegen clean-pool --split pool --shards 4
+build data/examples/pool.parquet "hours, git-bound" uv run --no-sync rulegen build-dataset --split pool --subset data/pool-clean.txt --jobs "$JOBS"
 if [ -e data/cves.parquet ]; then
     rp=$(uv run --no-sync python -c "
 from rulegen import corpus
@@ -246,6 +248,9 @@ if [ "$MODE" = verify ]; then
 from rulegen import extract
 print(extract.load_examples('data/examples/val.parquet')[0].cve)" 2>/dev/null)
     run uv run --no-sync rulegen show-prompt --cve "$cve" --policy P-H >/dev/null || miss "show-prompt on $cve"
+    run uv run --no-sync rulegen run --config experiments/teach.yaml --dry-run \
+        --set run_id=bootstrap-dry --set data.subset=data/pool-clean.0.txt || miss "dry run of the teacher config (budget vs slot)"
+    rm -rf runs/bootstrap-dry
 fi
 
 step "summary"

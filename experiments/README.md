@@ -17,6 +17,7 @@ with `--resume`) and `samples.parquet`.
 | `pipeline.yaml` | the validate-repair loop: b=8 chains, ≤3 rounds, oracle feedback or the self-critique control | model, policy, feedback, panel |
 | `mechanical.yaml` | the mechanical baseline: no model, the floor every model row must clear | split |
 | `frontier.yaml` | a frontier model through its vendor CLI in the loop, b=4, on the gold panel | model, effort, thinking, feedback, panel; or sampling n=8 |
+| `teach.yaml` | expert iteration: the anchor's oracle loop at suite parity over unruled CVEs | the id list: a pool shard, or any batch of CVEs |
 | `smoke.yaml` | an end-to-end smoke test of the harness with a scripted adapter and the real oracle | — |
 
 `models.yaml` is the model registry: the local models by Hugging Face repo and revision,
@@ -42,6 +43,7 @@ model (`fable`, `astra`, ...); `<policy>` is `pb`, `pm` or `ph`.
 | `frontier-<model>-o4-new` | the loop on the new-rule panel: CVEs no published rule exists for | `scripts/frontier.sh` |
 | `sample-qwen3.8-27b-ph-panel`, `pipeline-qwen3.8-27b-ph-{panel,newrule}-oracle` | the local anchor on the same panels, paired per CVE with the frontier cells | `scripts/frontier.sh` |
 | `agent-<cli>-{gold,new}` | one agent session per CVE (`rulegen agent-run`) on the agent panel and the new-rule panel | `scripts/frontier.sh` |
+| `teach-r<round>-<model>-<policy>-pool<shard>` | the teacher, one run per pool shard | `scripts/teach.sh` |
 | `smoke`, `smoke-<model>`, `smoke-<model>-cli` | smoke tests: the scripted adapter, a served model (`sweep.sh smoke`), a vendor CLI (`frontier.sh smoke`) | |
 
 Input policies (`prompt.policy`, rulegen/promptbuild.py): **P-B** the `-U3` diff; **P-C**

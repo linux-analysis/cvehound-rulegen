@@ -1,0 +1,57 @@
+# Expert iteration: the teacher (the anchor inside the validate-repair loop) over the clean
+# pool of unruled CVEs. scripts/teach.sh runs it shard by shard (--set data.subset=<shard>
+# --set run_id=<round>-<shard>); the same file generates rules for any id list of CVEs
+# (README: generating new rules for cvehound). The anchor is the GGUF build served by
+# llama-server (experiments/models.yaml: qwen3.8-27b-gguf).
+#
+# Acceptance is `strong`, so T4/T5/T6 failures are repaired instead of merely recorded, and
+# only rules that pass the oracle at suite parity end a chain. The rules are canonicalized
+# before scoring (`transform: canon`): detection form is what the oracle judges and what a
+# training target should be, so the model must repair what was actually checked.
+mode: pipeline
+transform: canon
+model:
+  adapter: openai-compat
+  model: qwen3.8-27b-ud-q4_k_m
+  thinking: false
+  concurrency: 4
+  timeout_s: 900
+prompt:
+  system_prompt: sys-v1
+  policy: P-H
+  budget_tokens: 8192
+sampling:
+  n: 1
+  temperature: 0.7
+  top_p: 0.95
+  max_tokens: 2048
+  seed: 0
+pipeline:
+  attempts: 8
+  rounds: 3
+  feedback: oracle
+  accept: strong
+data:
+  split: pool
+  subset: data/pool-clean.txt
+# Deployment knobs, not part of the cell identity (config_sha ignores them), so
+# they can be retuned mid-round without invalidating a resume.
+chunk_cves: 16
+oracle:
+  jobs: 16
+  run_selectivity: true
+  run_range: true
+  run_tree: true
+  # Informational scans at today's branch heads for every accepted rule: a fire
+  # is a regression or a missing backport to look at, never a verdict.
+  run_heads: true
+  # Whole-tree scans are the memory peak (RLIMIT_AS 8 GiB each): four at a time.
+  heavy_slots: 4
+  # The suite's --between-mode=commits: every non-merge commit touching the rule's
+  # files, deduped by blob signature. range_max_points 0 = no subsampling.
+  range_mode: commits
+  range_max_points: 0
+  tree_jobs: 2
+  # The cost probe is a whole-tree scan per accepted rule; it decides nothing inside
+  # the loop, so it is added once afterwards by the -full rescore.
+  run_cost: false
