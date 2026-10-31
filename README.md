@@ -236,6 +236,7 @@ rulegen/
   panel.py        seeded evaluation panels and the new-rule sample
   synthetic.py    expert iteration: the teacher's pool and the rules it keeps
 experiments/      one template per kind of cell, models.yaml
+results/          rules accepted in the Qwen3.8-27B oracle loop (round1)
 scripts/          bootstrap, serving, the experiment drivers, the suite audit
 tests/            unit tests, one file per module, shared builders in helpers.py (no spatch run or
                   network; the slow ones need the kernel clone)
