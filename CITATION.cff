@@ -4,6 +4,14 @@ type: software
 title: "cvehound-rulegen"
 version: "1.0.0"
 date-released: "2026-11-01"
+doi: "10.5281/zenodo.23856746"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.23856746"
+    description: "All versions; resolves to the latest one"
+  - type: doi
+    value: "10.5281/zenodo.23856747"
+    description: "Version 1.0.0"
 abstract: >-
   A testbench and pipeline for generating CVEhound Coccinelle detection rules for
   Linux kernel CVEs with language models. Each candidate rule is judged by an

@@ -244,8 +244,13 @@ tests/            unit tests, one file per module, shared builders in helpers.py
 
 ## Citing
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23856746.svg)](https://doi.org/10.5281/zenodo.23856746)
+
 If you use cvehound-rulegen, please cite it with the metadata in
-[CITATION.cff](CITATION.cff).
+[CITATION.cff](CITATION.cff). Every release is archived on Zenodo:
+[10.5281/zenodo.23856746](https://doi.org/10.5281/zenodo.23856746) resolves to the
+latest version, and version 1.0.0 is
+[10.5281/zenodo.23856747](https://doi.org/10.5281/zenodo.23856747).
 
 ## License
 
